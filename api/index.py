@@ -2,13 +2,26 @@ import sys
 import os
 from pathlib import Path
 
-# Add parent directory to path so we can import road_roughness_app
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add parent directory to path
+parent_dir = str(Path(__file__).parent.parent)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 
-# Set base directory for imports
-os.chdir(Path(__file__).parent.parent)
+# Change to parent directory so relative paths work
+try:
+    os.chdir(parent_dir)
+except:
+    pass
 
-from road_roughness_app import app
+# Import the FastAPI app
+try:
+    from road_roughness_app import app
+except Exception as e:
+    print(f"Error importing app: {e}")
+    import traceback
+    traceback.print_exc()
+    raise
 
-# Vercel requires this exact name
+# Export for Vercel
+# Vercel looks for 'app' or 'application' variable
 app = app
