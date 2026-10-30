@@ -51,7 +51,15 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from xml.dom import minidom
 
-import cv2
+# Try to import cv2, but make it optional for Vercel deployment
+try:
+    import cv2
+    CV2_AVAILABLE = True
+except (ImportError, OSError) as e:
+    print(f"Warning: OpenCV not available ({e}). Image processing features will be disabled.")
+    cv2 = None
+    CV2_AVAILABLE = False
+
 import ee
 import numpy as np
 import pandas as pd

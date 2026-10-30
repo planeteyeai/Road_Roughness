@@ -30,12 +30,14 @@ else:
     print(f"Static dir NOT found!")
 
 # Import the FastAPI app
+import_error = None
 try:
     print("Attempting to import road_roughness_app...")
     from road_roughness_app import app
     print("Successfully imported app!")
-except Exception as e:
-    print(f"ERROR importing app: {e}")
+except Exception as exc:
+    import_error = exc
+    print(f"ERROR importing app: {exc}")
     import traceback
     traceback.print_exc()
     
@@ -49,8 +51,16 @@ except Exception as e:
     def error_page():
         return JSONResponse({
             "error": "Failed to import main app",
-            "message": str(e),
-            "traceback": traceback.format_exc()
+            "message": str(import_error),
+            "traceback": traceback.format_exc(),
+            "help": "Check function logs in Vercel dashboard"
+        }, status_code=500)
+    
+    @app.get("/api/config")
+    def error_config():
+        return JSONResponse({
+            "error": "App failed to start",
+            "message": str(import_error)
         }, status_code=500)
 
 # Export for Vercel
