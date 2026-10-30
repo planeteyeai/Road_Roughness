@@ -51,15 +51,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from xml.dom import minidom
 
-# Try to import cv2, but make it optional for Vercel deployment
-try:
-    import cv2
-    CV2_AVAILABLE = True
-except (ImportError, OSError) as e:
-    print(f"Warning: OpenCV not available ({e}). Image processing features will be disabled.")
-    cv2 = None
-    CV2_AVAILABLE = False
-
+import cv2
 import ee
 import numpy as np
 import pandas as pd
@@ -84,20 +76,7 @@ from pydantic import BaseModel
 # ============================================================
 # CONFIG
 # ============================================================
-# Handle both local and Vercel environments
-BASE_DIR = Path(__file__).resolve().parent
-
-# For Vercel, ensure we're in the right directory
-if os.environ.get('VERCEL'):
-    # On Vercel, the working directory might be different
-    if not (BASE_DIR / "static").exists():
-        # Try to find the correct base directory
-        current = Path.cwd()
-        if (current / "static").exists():
-            BASE_DIR = current
-        elif (current.parent / "static").exists():
-            BASE_DIR = current.parent
-
+BASE_DIR     = Path(__file__).resolve().parent
 STORAGE_ROOT = Path(os.environ.get("RR_STORAGE", str(BASE_DIR / "storage")))
 PROJECTS_DIR = STORAGE_ROOT / "projects"
 STATIC_DIR   = BASE_DIR / "static"
@@ -1586,14 +1565,8 @@ async def json_errors(request, call_next):
 # call http://127.0.0.1:8000, so allow cross-origin requests (local tool).
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-# Mount static files if they exist
-try:
-    if (STATIC_DIR / "vendor").is_dir():
-        app.mount("/vendor", StaticFiles(directory=str(STATIC_DIR / "vendor")), name="vendor")
-    if STATIC_DIR.is_dir():
-        app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-except Exception as e:
-    print(f"Warning: Could not mount static files: {e}")
+if (STATIC_DIR / "vendor").is_dir():          # Leaflet served locally (no CDN needed)
+    app.mount("/vendor", StaticFiles(directory=str(STATIC_DIR / "vendor")), name="vendor")
 
 
 class NdwiRequest(BaseModel):
@@ -1626,13 +1599,7 @@ def _parse_range(start: str, end: str, cloud: int):
 
 @app.get("/")
 def index():
-    index_path = STATIC_DIR / "index.html"
-    if not index_path.exists():
-        return JSONResponse(
-            {"error": "index.html not found", "static_dir": str(STATIC_DIR), "exists": STATIC_DIR.exists()},
-            status_code=500
-        )
-    return FileResponse(index_path)
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 _TILE_SESSIONS = {}

@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: road-roughness-app
+    runtime: docker
+    plan: starter
+    region: oregon
+    envVars:
+      - key: GEE_PROJECT
+        value: arctic-hybrid-462806-c9
+      - key: GEE_SERVICE_ACCOUNT_KEY
+        sync: false
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: RR_HOST
+        value: 0.0.0.0
+      - key: RR_PORT
+        value: 8000
+    disk:
+      name: storage
+      mountPath: /app/storage
+      sizeGB: 10

@@ -1,9 +1,11 @@
 fastapi>=0.110
+uvicorn>=0.27
 python-multipart>=0.0.9
 earthengine-api>=0.1.390
 numpy
 pandas
 openpyxl
+opencv-python
 Pillow
 pyproj
 geopy
