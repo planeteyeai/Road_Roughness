@@ -1,0 +1,1328 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Road roughness survey</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<style>
+:root {
+  --concrete: #ECEEEB;   /* page */
+  --slab: #F8F9F7;       /* inputs, panels */
+  --ink: #1C2124;        /* asphalt text */
+  --kerb: #56616A;       /* secondary text */
+  --joint: #C7CDC9;      /* rules */
+  --marking: #F2B705;    /* road-marking yellow */
+  --road: #23292C;       /* condition strip surface, same in both themes */
+  --road-ink: #DDE2DF;
+  --good: #2F7D4F; --fair: #C98F00; --poor: #B8322A;
+  --good-bg: #DCEFE2; --fair-bg: #FBF0CC; --poor-bg: #F7DAD7;
+  --sans: "Barlow", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --cond: "Barlow Condensed", "Arial Narrow", "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --concrete: #14181A; --slab: #1C2225; --ink: #E6E9E7; --kerb: #9AA5AD; --joint: #353D41;
+    --marking: #F5C02B; --road: #0E1113;
+    --good-bg: #1D3828; --fair-bg: #3A3113; --poor-bg: #40201D;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--concrete); color: var(--ink); font: 400 16px/1.5 var(--sans); }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 1.25rem; }
+h1, h2 { font-family: var(--cond); font-weight: 600; letter-spacing: .005em; margin: 0; }
+h1 { font-size: 2.4rem; line-height: 1.05; }
+h2 { font-size: 1.55rem; line-height: 1.15; }
+h3 { font-size: 1rem; font-weight: 600; margin: 1.5rem 0 .5rem; }
+p { margin: 0; }
+a { color: inherit; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* masthead */
+.masthead { padding: 2.25rem 0 1.5rem; }
+.masthead-inner { display: flex; gap: 1.5rem; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; }
+.masthead p { color: var(--kerb); margin-top: .4rem; max-width: 62ch; }
+.logo { height: 56px; width: auto; max-width: 220px; object-fit: contain; margin-left: auto; align-self: flex-start; }
+@media (max-width: 640px) { .logo { height: 40px; } }
+
+/* steps */
+.step { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 1.25rem; padding: 2rem 0; border-top: 1px solid var(--joint); }
+.plate { width: 52px; height: 60px; background: var(--marking); color: #1C2124; display: grid; place-items: center;
+  font: 600 1.9rem/1 var(--cond); border-radius: 4px 4px 14px 14px; }
+.step-body { min-width: 0; }
+.step[aria-disabled="true"] .step-body { opacity: .45; pointer-events: none; }
+.step[aria-disabled="true"] .plate { background: var(--joint); }
+.step-head { display: flex; gap: .4rem 1rem; align-items: baseline; flex-wrap: wrap; margin-bottom: 1.1rem; }
+.status { color: var(--kerb); }
+.status.ok { color: var(--good); }
+
+/* form */
+label, legend { font-size: .875rem; font-weight: 500; color: var(--kerb); }
+.field { display: grid; gap: .3rem; align-content: start; }
+.hint { font-size: .8rem; color: var(--kerb); }
+input, select { font: inherit; color: var(--ink); background: var(--slab); border: 1px solid var(--joint);
+  border-radius: 4px; padding: .55rem .7rem; width: 100%; min-height: 2.6rem; }
+input[type=file] { padding: .45rem; }
+:focus-visible { outline: 3px solid var(--marking); outline-offset: 2px; }
+.grid { display: grid; gap: 1rem 1.25rem; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+.actions { display: flex; gap: .75rem; flex-wrap: wrap; align-items: center; margin-top: 1.25rem; }
+.btn { font: 600 .95rem/1 var(--sans); color: var(--ink); background: transparent; border: 1.5px solid var(--ink);
+  border-radius: 4px; padding: .7rem 1.05rem; cursor: pointer; text-decoration: none; display: inline-flex; gap: .5rem; align-items: center; }
+.btn.primary { background: var(--ink); color: var(--concrete); }
+.btn.small { padding: .5rem .75rem; font-size: .875rem; }
+.btn[aria-pressed="true"] { background: var(--marking); border-color: var(--marking); color: #1C2124; }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn.busy::after { content: ""; width: .85em; height: .85em; border: 2px solid currentColor; border-right-color: transparent;
+  border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(1turn); } }
+.linkbtn { background: none; border: 0; padding: 0; font: inherit; color: var(--ink); text-decoration: underline; cursor: pointer; }
+
+fieldset.segmented { border: 0; padding: 0; margin: 0; display: grid; gap: .3rem; min-width: 0; }
+.seg { display: flex; border: 1.5px solid var(--ink); border-radius: 4px; overflow: hidden; }
+.seg label { position: relative; flex: 1; margin: 0; color: var(--ink); font-size: .95rem; font-weight: 600; cursor: pointer; }
+.seg input { position: absolute; inset: 0; width: 1px; height: 1px; min-height: 0; opacity: 0; pointer-events: none; }
+.seg label > span { display: block; text-align: center; padding: .6rem .5rem; white-space: nowrap; }
+.seg label + label > span { border-left: 1.5px solid var(--ink); }
+.seg-main, .seg-sub { display: block; }
+.seg-sub { font-size: .85rem; font-weight: 500; margin-top: .15rem; opacity: .85; }
+.dirgrid { grid-template-columns: minmax(0, 460px) minmax(0, 260px); }
+.dir-note { color: var(--ink); font-weight: 600; }
+.dir-note:not(:empty)::before { content: "· "; color: var(--kerb); font-weight: 500; }
+@media (max-width: 640px) { .dirgrid { grid-template-columns: minmax(0, 1fr); } }
+.seg input:checked + span { background: var(--ink); color: var(--concrete); }
+.seg input:focus-visible + span { outline: 3px solid var(--marking); outline-offset: -3px; }
+
+/* map + drawing */
+.maptools { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-bottom: .6rem; }
+.maptools .search { flex: 1 1 260px; display: flex; gap: .5rem; }
+.maptools .search input { min-height: 2.3rem; padding: .4rem .65rem; }
+#map { height: 480px; border: 1px solid var(--joint); border-radius: 4px; background: #1b1f21; }
+#map.drawing { cursor: crosshair; }
+#map.drawing .leaflet-interactive { cursor: crosshair; }
+.drawinfo { margin-top: .5rem; font-size: .9rem; color: var(--kerb); }
+.vtx { background: #fff; border: 2px solid #1C2124; border-radius: 50%; }
+.vtx-start { background: var(--marking); border-color: #1C2124; }
+.measure-tip { position: absolute; z-index: 1000; pointer-events: none; background: rgba(28,33,36,.92); color: #fff;
+  font: 500 .8rem/1.35 var(--sans); padding: .35rem .5rem; border-radius: 4px; white-space: nowrap; font-variant-numeric: tabular-nums;
+  border: 1px solid rgba(255,255,255,.3); }
+.leaflet-tooltip.ch-label { background: rgba(28,33,36,.88); color: #fff; border: 0; box-shadow: none; padding: 1px 5px;
+  font: 600 11px/1.3 var(--cond); font-variant-numeric: tabular-nums; }
+.leaflet-tooltip.ch-label::before { display: none; }
+.leaflet-tooltip.ch-end { background: #F2B705; color: #1C2124; font-size: 12px; }
+.leaflet-control.compass-ctl { pointer-events: none; background: none; border: 0; margin: 6px 0 0 4px; }
+.compass-ctl svg { display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,.45)); }
+.fit-ctl a { display: grid !important; place-items: center; color: #1C2124; }
+#mapHint { margin-top: .35rem; }
+.replace-note { margin-top: 1rem; }
+.upload { margin-top: 1rem; display: grid; gap: .3rem; max-width: 520px; }
+
+/* messages */
+.msg { margin-top: 1rem; padding: .8rem 1rem; border-left: 4px solid var(--kerb); background: var(--slab); max-width: 80ch; }
+.msg.ok { border-color: var(--good); }
+.msg.warn { border-color: var(--fair); }
+.msg.err { border-color: var(--poor); }
+.msg p + p, .msg p + .chips { margin-top: .5rem; }
+.chips { display: flex; gap: .5rem; flex-wrap: wrap; }
+.chip { font: 500 .9rem/1.2 var(--sans); color: var(--ink); background: var(--concrete); border: 1px solid var(--joint);
+  border-radius: 4px; padding: .45rem .7rem; cursor: pointer; text-align: left; }
+.chip strong { display: block; font-weight: 600; }
+.chip:hover { border-color: var(--ink); }
+
+/* facts */
+.facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: .75rem 1.25rem; margin: 1.25rem 0 0; }
+.facts div { border-left: 2px solid var(--joint); padding-left: .7rem; }
+.facts dt { font-size: .8rem; color: var(--kerb); }
+.facts dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* progress */
+.progress { height: 8px; background: var(--joint); border-radius: 4px; overflow: hidden; margin-top: 1rem; }
+.progress > div { height: 100%; width: 0; background: var(--marking); transition: width .4s; }
+pre.log { margin: .75rem 0 0; max-height: 220px; overflow: auto; background: var(--slab); border: 1px solid var(--joint);
+  border-radius: 4px; padding: .7rem .8rem; font: 400 .8rem/1.45 ui-monospace, Consolas, monospace; white-space: pre-wrap; }
+
+.runs { list-style: none; padding: 0; margin: .25rem 0 0; display: grid; gap: .4rem; }
+.runs li { display: flex; gap: .4rem 1rem; flex-wrap: wrap; align-items: baseline; padding: .55rem 0; border-bottom: 1px solid var(--joint); }
+.tag { font-size: .8rem; font-weight: 600; padding: .1rem .45rem; border-radius: 3px; background: var(--joint); }
+.tag.done { background: var(--good-bg); color: var(--good); }
+.tag.error, .tag.interrupted { background: var(--poor-bg); color: var(--poor); }
+.tag.running { background: var(--fair-bg); color: var(--fair); }
+
+/* report downloads */
+.dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: .75rem 1.25rem; margin-top: 1.25rem; }
+.dl > div { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
+.dl strong { font: 600 1.15rem/1 var(--cond); min-width: 3.2rem; }
+fieldset.restoggle { margin-top: 1.5rem; max-width: 260px; }
+
+/* condition strip: the road drawn as lanes */
+.road { background: var(--road); color: var(--road-ink); border-radius: 6px; padding: 1rem 1rem .75rem; margin-top: 1rem; }
+.road-head { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; font-size: .85rem; margin-bottom: .75rem; }
+.legend { display: flex; gap: 1rem; }
+.legend span::before { content: ""; display: inline-block; width: .8rem; height: .8rem; margin-right: .35rem; vertical-align: -1px; border-radius: 2px; background: var(--c); }
+.road-scroll { overflow-x: auto; }
+.lane { display: grid; grid-template-columns: 64px 1fr; align-items: center; gap: .6rem; }
+.lane + .lane { margin-top: 3px; }
+.lane-label { font: 600 .9rem/1 var(--cond); text-align: right; }
+.track { display: flex; gap: 1px; height: 22px; }
+.cell { flex: 1 0 3px; background: #3B4347; border: 0; padding: 0; cursor: pointer; }
+.cell.Good { background: #3DA068; } .cell.Fair { background: #E2B32A; } .cell.Poor { background: #D9483B; }
+.cell:hover, .cell.sel { outline: 2px solid #fff; outline-offset: -1px; }
+.centre { display: grid; grid-template-columns: 64px 1fr; gap: .6rem; margin: 6px 0; }
+.centre div:last-child { height: 0; border-top: 3px dashed var(--marking); align-self: center; }
+.ticks { display: grid; grid-template-columns: 64px 1fr; gap: .6rem; margin-top: .45rem; font: 500 .8rem/1 var(--cond); }
+.ticks .scale { display: flex; justify-content: space-between; }
+
+/* tables */
+.tablewrap { overflow: auto; max-height: 520px; border: 1px solid var(--joint); border-radius: 4px; margin-top: 1rem; background: var(--slab); }
+table { border-collapse: collapse; width: 100%; font-size: .85rem; font-variant-numeric: tabular-nums; }
+th, td { padding: .45rem .6rem; border-bottom: 1px solid var(--joint); text-align: left; white-space: nowrap; }
+th { position: sticky; top: 0; background: var(--ink); color: var(--concrete); font-weight: 600; z-index: 1; }
+td.r, th.r { text-align: right; }
+#repTable tbody tr { cursor: pointer; }
+#repTable tbody tr:hover, #repTable tbody tr.sel { background: var(--concrete); }
+.pill { font-weight: 600; padding: .1rem .5rem; border-radius: 3px; }
+.pill.Good { background: var(--good-bg); color: var(--good); }
+.pill.Fair { background: var(--fair-bg); color: var(--fair); }
+.pill.Poor { background: var(--poor-bg); color: var(--poor); }
+.summary { max-width: 640px; }
+.summary tr:last-child td { font-weight: 600; }
+
+figure.preview { margin: 1rem 0 0; border: 1px solid var(--joint); border-radius: 4px; padding: .75rem; background: var(--slab); }
+figure.preview img { max-width: 100%; max-height: 280px; object-fit: contain; display: block; margin: 0 auto; }
+figure.preview figcaption { font-size: .85rem; color: var(--kerb); margin-top: .5rem; }
+
+.conn { margin: 0 0 1.25rem; padding: .9rem 1rem; border-left: 4px solid var(--poor); background: var(--slab); }
+.conn.warn { border-color: var(--fair); }
+.conn p + p { margin-top: .4rem; }
+.conn code { font-size: .9em; background: var(--concrete); padding: .05rem .3rem; border-radius: 3px; }
+.conn .actions { margin-top: .75rem; }
+[hidden] { display: none !important; }
+@media (max-width: 640px) {
+  .step { grid-template-columns: minmax(0, 1fr); gap: .75rem; }
+  .plate { width: 40px; height: 46px; font-size: 1.5rem; }
+  h1 { font-size: 2rem; }
+  #map { height: 380px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .progress > div { transition: none; }
+  .btn.busy::after { animation: none; }
+}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wrap masthead-inner">
+    <div>
+      <h1>Road roughness survey</h1>
+      <p>Draw the median line on satellite imagery, pull Sentinel-2 NDWI for every 100 m bin, and get RI / IRI reports at 100 m and 10 m.</p>
+    </div>
+    <img class="logo" src="logo.png" alt="Company logo" onerror="this.hidden=true">
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="conn" id="conn" role="alert" hidden></div>
+
+  <!-- STEP 1 -->
+  <section class="step" id="step1">
+    <div class="plate" aria-hidden="true">1</div>
+    <div class="step-body">
+      <div class="step-head">
+        <h2>Lane KMLs</h2>
+        <p class="status" id="s1status">Draw the median line on the map, or upload a KML.</p>
+      </div>
+
+      <div class="maptools" id="mapTools">
+        <button type="button" class="btn small" id="drawBtn" aria-pressed="false">Draw median line</button>
+        <button type="button" class="btn small" id="undoBtn">Undo point</button>
+        <button type="button" class="btn small" id="reverseBtn">Reverse direction</button>
+        <button type="button" class="btn small" id="clearBtn">Clear</button>
+        <form class="search" id="searchForm">
+          <input id="searchBox" placeholder="Find a place, or type lat, lon" aria-label="Find a place or coordinates">
+          <button type="submit" class="btn small">Go</button>
+        </form>
+      </div>
+      <div id="map" role="application" aria-label="Satellite map for drawing the median line"></div>
+      <p class="drawinfo num" id="drawInfo" aria-live="polite"></p>
+      <p class="hint" id="mapHint" hidden></p>
+
+      <form id="laneForm" novalidate>
+        <div class="upload">
+          <label for="kmlFile">Or upload the median line (KML or KMZ)</label>
+          <input type="file" id="kmlFile" accept=".kml,.kmz">
+        </div>
+        <div class="grid" style="margin-top:1.25rem">
+          <div class="field">
+            <label for="pName">Project name</label>
+            <input id="pName" placeholder="Optional">
+          </div>
+          <div class="field">
+            <label for="chStart">Chainage start (km)</label>
+            <input id="chStart" type="number" step="0.001" required>
+          </div>
+          <div class="field">
+            <label for="medOff">Median offset (m)</label>
+            <input id="medOff" type="number" step="0.001" min="0" required>
+            <span class="hint">Each side of the centre line</span>
+          </div>
+          <div class="field">
+            <label for="lanes">Road lanes</label>
+            <select id="lanes">
+              <option value="2">2-lane road (L1 each side)</option>
+              <option value="4">4-lane road (L1, L2)</option>
+              <option value="6">6-lane road (L1, L2, L3)</option>
+            </select>
+          </div>
+        </div>
+        <div class="actions">
+          <button type="submit" class="btn primary" id="laneBtn">Save line and generate lane KMLs</button>
+        </div>
+        <div class="msg warn replace-note" id="replaceNote" hidden>
+          <p id="replaceText"></p>
+          <p><button type="button" class="linkbtn" id="backBtn">Keep the current project</button></p>
+        </div>
+        <div id="s1msg"></div>
+      </form>
+
+      <div id="laneResult" hidden>
+        <dl class="facts" id="facts"></dl>
+        <div class="actions">
+          <a class="btn" id="kmlZip" href="#">Download KMLs and Excels (ZIP)</a>
+          <a class="btn" id="lineKml" href="#">Download median line KML</a>
+          <button type="button" class="linkbtn" id="newProjectBtn">Start a new project (replaces this one)</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="step" id="step2" aria-disabled="true">
+    <div class="plate" aria-hidden="true">2</div>
+    <div class="step-body">
+      <div class="step-head">
+        <h2>Sentinel-2 NDWI images</h2>
+        <p class="status" id="s2status">Needs lane KMLs first.</p>
+      </div>
+      <div class="grid">
+        <div class="field"><label for="dStart">Start date</label><input id="dStart" type="date"></div>
+        <div class="field"><label for="dEnd">End date</label><input id="dEnd" type="date"></div>
+      </div>
+      <p class="hint" style="margin-top:.5rem">Only captures with less than 40% cloud are used. Captures are checked as soon as you change a date.</p>
+      <div id="checkResult"></div>
+      <div class="actions">
+        <button type="button" class="btn primary" id="ndwiBtn" disabled>Generate NDWI images</button>
+      </div>
+      <div id="taskBox" hidden>
+        <div class="progress" aria-hidden="true"><div id="bar"></div></div>
+        <p class="status num" id="taskStatus" style="margin-top:.5rem" aria-live="polite"></p>
+        <pre class="log" id="taskLog"></pre>
+      </div>
+      <div id="runsBox" hidden>
+        <h3>Stored image sets</h3>
+        <ul class="runs" id="runsList"></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="step" id="step3" aria-disabled="true">
+    <div class="plate" aria-hidden="true">3</div>
+    <div class="step-body">
+      <div class="step-head">
+        <h2>Roughness report</h2>
+        <p class="status" id="s3status">Needs NDWI images first.</p>
+      </div>
+      <div class="grid dirgrid">
+        <fieldset class="segmented">
+          <legend>Imagery direction <span class="dir-note" id="roadDir"></span></legend>
+          <div class="seg">
+            <label><input type="radio" name="mode" id="modeA" value="up_to_down" checked><span><span class="seg-main">North → South / West → East</span><span class="seg-sub num" id="upRange">&nbsp;</span></span></label>
+            <label><input type="radio" name="mode" id="modeB" value="down_to_up"><span><span class="seg-main">South → North / East → West</span><span class="seg-sub num" id="downRange">&nbsp;</span></span></label>
+          </div>
+        </fieldset>
+        <div class="field">
+          <label for="surface">Pavement</label>
+          <select id="surface">
+            <option value="Bituminous">Bituminous</option>
+            <option value="Concrete">Concrete</option>
+          </select>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn primary" id="roughBtn">Generate 100 m and 10 m RI (JSON)</button>
+      </div>
+      <div id="s3msg"></div>
+
+      <div id="reportBox" hidden>
+        <details class="jsonbox" open>
+          <summary>RI / IRI JSON (<span id="jsonRes">100 m</span>)</summary>
+          <button type="button" class="btn small" id="copyJson">Copy JSON</button>
+          <pre id="jsonOut" style="max-height:320px;overflow:auto;font-size:12px"></pre>
+        </details>
+
+        <fieldset class="segmented restoggle">
+          <legend>Show sections of</legend>
+          <div class="seg">
+            <label><input type="radio" name="res" value="100m" checked><span>100 m</span></label>
+            <label><input type="radio" name="res" value="10m"><span>10 m</span></label>
+          </div>
+        </fieldset>
+
+        <div class="road" id="road"></div>
+
+        <h3>Summary by lane</h3>
+        <div class="tablewrap summary"><table id="sumTable"></table></div>
+
+        <h3 id="tableTitle">100 m sections</h3>
+        <p class="status">Select a row or a strip cell to see its NDWI image.</p>
+        <figure class="preview" id="preview" hidden>
+          <img id="previewImg" alt="">
+          <figcaption id="previewCap"></figcaption>
+        </figure>
+        <div class="tablewrap"><table id="repTable"></table></div>
+      </div>
+
+      <div id="oldReports" hidden>
+        <h3>Earlier reports</h3>
+        <ul class="runs" id="oldReportsList"></ul>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="vendor/leaflet/leaflet.js"></script>
+<script>
+  /* local copy missing (e.g. only index.html was copied) -> use the CDN */
+  if (!window.L) document.write('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">'
+    + '<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"><\/script>');
+</script>
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = (v, d) => (v === null || v === undefined || Number.isNaN(v)) ? "–" : Number(v).toFixed(d);
+
+/* The page talks to the local FastAPI backend. Served by the backend itself,
+   it uses the same origin; opened as a file or from another port, it falls
+   back to http://127.0.0.1:8000 (override with ?api=http://host:port). */
+let API = "";
+async function resolveApi() {
+  const q = new URLSearchParams(location.search).get("api");
+  if (q) { API = q.replace(/\/$/, ""); return; }
+  if (location.protocol.startsWith("http")) {
+    try {
+      const r = await fetch("/api/config");
+      if (r.ok && (r.headers.get("content-type") || "").includes("json")) { API = ""; return; }
+    } catch (_) { /* not the backend */ }
+  }
+  API = "http://127.0.0.1:8000";
+}
+const u = (path) => API + path;
+
+const APP_VERSION = "1.5";
+const FALLBACK_CFG = { defaults: { chainage_start_km: 135.5, median_offset_m: 0.001, lane_count: 4 }, cloud: 40 };
+const PUNE = { center: [18.5204, 73.8567], zoom: 12 };
+
+const state = { replacing: null, centre: null, cfg: null, project: null, runs: [], reports: [], checked: null, poll: null, report: null, res: "100m" };
+let map = null, laneLayer = null;
+const MAX_EDIT_VERTICES = 400;
+const draw = { active: false, pts: [], line: null, markers: [], file: null, sourceFile: null, edited: false };
+
+function backendUrl() { return API || location.origin; }
+
+async function api(path, opts = {}) {
+  let res;
+  try { res = await fetch(u(path), opts); }
+  catch (_) {                      // network / CORS failure: browser only says "Failed to fetch"
+    showConnection("down");
+    throw new Error(`Can't reach the backend at ${backendUrl()}. See the message at the top of the page.`);
+  }
+  let body = null;
+  try { body = await res.json(); } catch (_) { /* non-JSON */ }
+  if (!res.ok) {
+    let msg = body && body.detail;
+    if (Array.isArray(msg)) msg = msg.map(d => `${(d.loc || []).slice(-1)[0]}: ${d.msg}`).join("; ");
+    throw new Error(msg || `Request failed (${res.status}).`);
+  }
+  return body;
+}
+function busy(btn, on) { btn.disabled = on; btn.classList.toggle("busy", on); }
+function message(el, kind, html) { el.innerHTML = html ? `<div class="msg ${kind}">${html}</div>` : ""; }
+function iso(d) { return d.toISOString().slice(0, 10); }
+
+/* ---------- init: the map never waits for the backend ---------- */
+async function init() {
+  initMap();
+  setDefaults(FALLBACK_CFG);
+  await connectBackend();
+}
+
+async function connectBackend() {
+  await resolveApi();
+  try { state.cfg = await api("/api/config"); } catch (_) { return false; }  // banner shown by api()
+  showConnection(state.cfg.version !== APP_VERSION ? "old" : "ok");
+  setDefaults(state.cfg, true);
+  loadMapTiles();
+  await loadCurrentProject();
+  return true;
+}
+
+function showConnection(kind) {
+  const el = $("#conn");
+  const at = backendUrl();
+  if (kind === "ok") { el.hidden = true; el.innerHTML = ""; return; }
+  el.hidden = false;
+  el.className = kind === "old" ? "conn warn" : "conn";
+  const pageHint = location.origin === "http://127.0.0.1:8000"
+    ? "" : `<p>Easiest: open the page from the backend itself at <a href="http://127.0.0.1:8000/">http://127.0.0.1:8000/</a>.</p>`;
+  el.innerHTML = kind === "old"
+    ? `<p><strong>An older backend is running at ${esc(at)}.</strong> Stop it (Ctrl+C in its window) and start the new <code>road_roughness_app.py</code> again.</p>${pageHint}
+       <div class="actions"><button type="button" class="btn small" id="connRetry">Check again</button></div>`
+    : `<p><strong>Can't reach the backend at ${esc(at)}.</strong> The map works, but saving lines and reports needs the backend.</p>
+       <p>Start it in a terminal with <code>python road_roughness_app.py</code>. If it is already running, stop it (Ctrl+C) and start it again so the latest version is loaded.</p>${pageHint}
+       <div class="actions"><button type="button" class="btn small" id="connRetry">Try again</button></div>`;
+  $("#connRetry").addEventListener("click", connectBackend);
+}
+
+function setDefaults(cfg, onlyEmpty = false) {
+  const d = cfg.defaults;
+  const put = (id, v) => { if (!onlyEmpty || !$(id).value) $(id).value = v; };
+  put("#chStart", Number(d.chainage_start_km).toFixed(3));
+  put("#medOff", d.median_offset_m);
+  if (!onlyEmpty) { $("#lanes").value = String(d.lane_count); $("#pName").value = ""; }
+  const today = new Date();
+  put("#dEnd", iso(today));
+  put("#dStart", iso(new Date(today.getTime() - 30 * 864e5)));
+  $("#dEnd").max = $("#dStart").max = iso(today);
+}
+
+/* Only one project is kept: saving a new one deletes the previous one. */
+async function loadCurrentProject() {
+  const list = await api("/api/projects");
+  if (list.length && list[0].id !== state.project?.id && !state.replacing) await openProject(list[0].id);
+}
+
+$("#newProjectBtn").addEventListener("click", resetToNew);
+$("#backBtn").addEventListener("click", () => { if (state.replacing) openProject(state.replacing.id); });
+
+function resetToNew() {
+  stopPolling();
+  state.replacing = state.project || state.replacing;          // shown in the warning; deleted on save
+  state.project = null; state.runs = []; state.reports = []; state.checked = null; state.report = null; state.centre = null;
+  $("#laneForm").hidden = false; $("#laneResult").hidden = true; $("#mapTools").hidden = false; $("#drawInfo").hidden = false;
+  $("#laneForm").reset(); setDefaults(state.cfg || FALLBACK_CFG);
+  if (laneLayer) { laneLayer.remove(); laneLayer = null; }
+  clearDrawing();
+  const note = $("#replaceNote");
+  note.hidden = !state.replacing;
+  if (state.replacing) $("#replaceText").textContent =
+    `Saving deletes the current project “${state.replacing.name}” with its KMLs, NDWI images and reports.`;
+  $("#s1status").textContent = "Draw the median line on the map, or upload a KML."; $("#s1status").className = "status";
+  lockStep(2, true, "Needs lane KMLs first."); lockStep(3, true, "Needs NDWI images first.");
+  $("#checkResult").innerHTML = ""; $("#taskBox").hidden = true; $("#runsBox").hidden = true;
+  $("#reportBox").hidden = true; $("#oldReports").hidden = true; message($("#s3msg"), "", ""); message($("#s1msg"), "", "");
+  $("#ndwiBtn").disabled = true;
+  updateDirectionLabels(null);
+}
+
+/* Imagery direction. Backend modes: "up_to_down" = north→south (or east→west),
+   "down_to_up" = south→north (or west→east). The two options are shown as
+   A = "North → South / West → East" and B = "South → North / East → West",
+   so on an east-west road the radio values swap to keep each label true. */
+const dirText = (o) => `${o.from} → ${o.to} (${Math.round(o.bearing)}°)`;
+
+function updateDirectionLabels(p) {
+  const o = p?.summary?.orientation;
+  const A = $("#modeA"), B = $("#modeB");
+  if (!o) {
+    A.value = "up_to_down"; B.value = "down_to_up";
+    $("#upRange").innerHTML = $("#downRange").innerHTML = "&nbsp;";
+    $("#roadDir").textContent = "";
+    return;
+  }
+  const ns = o.axis === "NS";
+  A.value = ns ? "up_to_down" : "down_to_up";
+  B.value = ns ? "down_to_up" : "up_to_down";
+  const a = Number(p.summary.chainage_start_km);
+  const b = a + p.summary.bins_per_lane * Number(p.params.bin_km);
+  const upRunsDown = ["N", "E"].includes(o.increases_towards);   // north/east end has the higher chainage
+  const range = (mode) => (mode === "up_to_down") === upRunsDown
+    ? `${b.toFixed(3)} → ${a.toFixed(3)}` : `${a.toFixed(3)} → ${b.toFixed(3)}`;
+  $("#upRange").textContent = range(A.value);
+  $("#downRange").textContent = range(B.value);
+  $("#roadDir").textContent = dirText(o);
+}
+
+function lockStep(n, locked, status) {
+  $(`#step${n}`).setAttribute("aria-disabled", locked ? "true" : "false");
+  if (status) { const s = $(`#s${n}status`); s.textContent = status; s.className = "status"; }
+}
+
+/* ---------- map ---------- */
+let baseLayers = {}, layerControl = null, measureLayer = null, rubber = null, tipEl = null, googleCopy = null;
+
+function initMap() {
+  if (typeof L === "undefined") {
+    $("#map").innerHTML = `<p style="padding:1rem;color:#ddd">The map library could not load. Keep the <code>vendor</code> folder next to index.html, or check the internet connection. You can still upload a KML below.</p>`;
+    $("#mapTools").hidden = true;
+    return;
+  }
+  map = L.map("map", { zoomControl: false, maxZoom: 22 }).setView(PUNE.center, PUNE.zoom);   // opens on Pune
+  // Google Hybrid (satellite + labels) is the default map. Tiles exist to zoom 20;
+  // closer than that the zoom-20 imagery is enlarged so the picture never disappears.
+  const google = (lyrs) => {
+    const layer = L.tileLayer(`https://mt1.google.com/vt/lyrs=${lyrs}&x={x}&y={y}&z={z}`,
+      { maxZoom: 22, maxNativeZoom: 20, attribution: '&copy; <a href="https://www.google.com/maps">Google Maps</a>' });
+    layer.on("tileerror", (e) => {          // no imagery at this zoom here: use the level below
+      const z = e.coords.z;
+      if (z > 15 && layer.options.maxNativeZoom >= z) { layer.options.maxNativeZoom = z - 1; layer.redraw(); }
+    });
+    return layer;
+  };
+  const gHybrid = google("y"), gSat = google("s");
+  const esri = "https://server.arcgisonline.com/ArcGIS/rest/services/";
+  // Esri has imagery to zoom 18 almost everywhere; deeper tiles can read "Map data not
+  // yet available", so zoom 19-22 enlarges the zoom-18 imagery instead.
+  const esriSat = L.tileLayer(esri + "World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    { maxZoom: 22, maxNativeZoom: 18, attribution: "Imagery © Esri, Maxar, Earthstar Geographics" });
+  const places = L.tileLayer(esri + "Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+    { maxZoom: 22, maxNativeZoom: 18 });
+  const roads = L.tileLayer(esri + "Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
+    { maxZoom: 22, maxNativeZoom: 18 });
+  const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    { maxZoom: 22, maxNativeZoom: 19, attribution: "© OpenStreetMap contributors" });
+  gHybrid.addTo(map);
+  baseLayers = { "Google hybrid": gHybrid, "Google satellite": gSat, "Esri satellite": esriSat, "Streets": osm };
+  layerControl = L.control.layers(baseLayers, { "Place names": places, "Road names": roads }).addTo(map);
+  L.control.scale({ imperial: false }).addTo(map);
+  addCompassControl();                                   // top-left: compass, then zoom, then fit
+  L.control.zoom({ position: "topleft" }).addTo(map);
+  addFitControl();
+  measureLayer = L.layerGroup().addTo(map);
+  tipEl = L.DomUtil.create("div", "measure-tip", map.getContainer());
+  tipEl.hidden = true;
+  map.on("click", onMapClick);
+  map.on("dblclick", () => { if (draw.active) setDrawing(false); });
+  map.on("mousemove", onMouseMove);
+  map.on("zoomend", drawMeasurements);
+  map.on("baselayerchange", updateGoogleCopyright);
+  map.on("moveend", () => { clearTimeout(googleCopy?.timer); if (googleCopy) googleCopy.timer = setTimeout(updateGoogleCopyright, 700); });
+  map.getContainer().addEventListener("mouseleave", () => { tipEl.hidden = true; if (rubber) rubber.setLatLngs([]); });
+  updateDrawInfo();
+}
+
+/* Google satellite through the official Map Tiles API (key set in the backend). */
+async function loadMapTiles() {
+  if (!map || baseLayers["Google satellite (API key)"]) return;
+  let info;
+  try { info = await api("/api/map-tiles"); } catch (_) { return; }
+  const hint = $("#mapHint");
+  if (info.provider !== "google") {                   // no key: nothing to add; a failing key: say why
+    hint.hidden = info.reason === "no_key";
+    if (!hint.hidden) hint.textContent = info.reason;
+    return;
+  }
+  hint.hidden = true;
+  const make = (url) => {
+    const layer = L.tileLayer(url, { maxZoom: 22, maxNativeZoom: 20, attribution: "Imagery © Google" });
+    // Where Google has no imagery at this zoom the tile request fails: use the
+    // zoom level below and enlarge it, so imagery shows at every zoom.
+    layer.on("tileerror", (e) => {
+      const z = e.coords.z;
+      if (z > 15 && layer.options.maxNativeZoom >= z) { layer.options.maxNativeZoom = z - 1; layer.redraw(); }
+    });
+    return layer;
+  };
+  const sat = make(info.layers.satellite.url), hyb = make(info.layers.hybrid.url);
+  baseLayers["Google satellite (API key)"] = sat; baseLayers["Google hybrid (API key)"] = hyb;
+  layerControl.addBaseLayer(sat, "Google satellite (API key)");
+  layerControl.addBaseLayer(hyb, "Google hybrid (API key)");
+  googleCopy = { info, sat, hyb, text: null, timer: null };
+}
+
+async function updateGoogleCopyright() {
+  if (!googleCopy) return;
+  const g = googleCopy, ctl = map.attributionControl;
+  const kind = map.hasLayer(g.sat) ? "satellite" : map.hasLayer(g.hyb) ? "hybrid" : null;
+  if (!kind) { if (g.text) { ctl.removeAttribution(g.text); g.text = null; } return; }
+  const b = map.getBounds(), clamp = (v, m) => Math.max(-m, Math.min(m, v));
+  const q = new URLSearchParams({ session: g.info.layers[kind].session, key: g.info.key, zoom: Math.min(map.getZoom(), 22),
+    north: clamp(b.getNorth(), 85), south: clamp(b.getSouth(), 85), east: clamp(b.getEast(), 180), west: clamp(b.getWest(), 180) });
+  try {
+    const j = await (await fetch(`https://tile.googleapis.com/tile/v1/viewport?${q}`)).json();
+    if (j.copyright && j.copyright !== g.text) {
+      if (g.text) ctl.removeAttribution(g.text);
+      g.text = j.copyright; ctl.addAttribution(g.text);
+    }
+  } catch (_) { /* keep the static "Imagery © Google" */ }
+}
+
+/* Compass rose: four-point star over a ticked ring, no background. Light
+   outlines keep it readable on dark imagery. North is always up on this map. */
+function compassSvg() {
+  const c = 66, tip = 44, w = 10.6;                     // arm tip radius, waist offset (15 at 45 deg)
+  let ticks = "";
+  for (let a = 0; a < 360; a += 10) {
+    const r = a * Math.PI / 180, r1 = a % 90 === 0 ? 22 : 26, r2 = 31;
+    ticks += `<line x1="${(c + r1 * Math.sin(r)).toFixed(2)}" y1="${(c - r1 * Math.cos(r)).toFixed(2)}" x2="${(c + r2 * Math.sin(r)).toFixed(2)}" y2="${(c - r2 * Math.cos(r)).toFixed(2)}"/>`;
+  }
+  const arm = (deg) => `<g transform="rotate(${deg} ${c} ${c})">
+      <polygon points="${c},${c - tip} ${c - w},${c - w} ${c},${c}" fill="#6b7378"/>
+      <polygon points="${c},${c - tip} ${c + w},${c - w} ${c},${c}" fill="#15191b"/></g>`;
+  const letter = (t, x, y) => `<text x="${x}" y="${y}">${t}</text>`;
+  return `<svg viewBox="0 0 132 132" width="124" height="124" role="img" aria-label="Compass, north is up">
+    <g fill="none" stroke-linecap="round">
+      <circle cx="${c}" cy="${c}" r="32" stroke="rgba(255,255,255,.6)" stroke-width="3.6"/>
+      <circle cx="${c}" cy="${c}" r="32" stroke="#2b3134" stroke-width="1.4"/>
+      <circle cx="${c}" cy="${c}" r="21.5" stroke="rgba(255,255,255,.6)" stroke-width="3.2"/>
+      <circle cx="${c}" cy="${c}" r="21.5" stroke="#2b3134" stroke-width="1.2"/>
+      <g stroke="#2b3134" stroke-width="1">${ticks}</g>
+    </g>
+    <g stroke="rgba(255,255,255,.75)" stroke-width=".9" stroke-linejoin="round">${[0, 90, 180, 270].map(arm).join("")}</g>
+    <g font-family="Barlow Condensed, Arial Narrow, Arial, sans-serif" font-weight="700" font-size="19" text-anchor="middle"
+       fill="#111" stroke="#fff" stroke-width="3" paint-order="stroke" stroke-linejoin="round">
+      ${letter("N", c, 17)}${letter("E", 121, c + 7)}${letter("S", c, 129)}${letter("W", 11, c + 7)}
+    </g>
+  </svg>`;
+}
+
+function addCompassControl() {
+  const Compass = L.Control.extend({
+    options: { position: "topleft" },
+    onAdd() {
+      const div = L.DomUtil.create("div", "compass-ctl");
+      div.innerHTML = compassSvg();
+      return div;
+    },
+  });
+  new Compass().addTo(map);
+}
+
+function addFitControl() {
+  const Fit = L.Control.extend({
+    options: { position: "topleft" },
+    onAdd() {
+      const div = L.DomUtil.create("div", "leaflet-bar fit-ctl");
+      const a = L.DomUtil.create("a", "", div);
+      a.href = "#"; a.title = "Zoom to the whole road";
+      a.setAttribute("role", "button"); a.setAttribute("aria-label", "Zoom to the whole road");
+      a.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M1.5 5.5v-4h4M10.5 1.5h4v4M14.5 10.5v4h-4M5.5 14.5h-4v-4"/></svg>`;
+      L.DomEvent.on(a, "click", (e) => { L.DomEvent.stop(e); fitAll(); });
+      L.DomEvent.disableClickPropagation(div);
+      return div;
+    },
+  });
+  new Fit().addTo(map);
+}
+
+function fitAll() {
+  const b = laneLayer ? laneLayer.getBounds() : (draw.line && draw.pts.length ? draw.line.getBounds() : null);
+  if (b && b.isValid()) map.fitBounds(b, { padding: [36, 36], maxZoom: 18 });
+  else map.setView(PUNE.center, PUNE.zoom);
+}
+
+/* ---------- distances on the WGS84 ellipsoid (Vincenty), same as the backend ---------- */
+function geoDist(a, b) {
+  const A = 6378137, F = 1 / 298.257223563, B = A * (1 - F), r = Math.PI / 180;
+  const L0 = (b.lng - a.lng) * r;
+  const U1 = Math.atan((1 - F) * Math.tan(a.lat * r)), U2 = Math.atan((1 - F) * Math.tan(b.lat * r));
+  const sU1 = Math.sin(U1), cU1 = Math.cos(U1), sU2 = Math.sin(U2), cU2 = Math.cos(U2);
+  let lam = L0, prev, it = 0, sS, cS, sig, c2a, c2m;
+  do {
+    const sl = Math.sin(lam), cl = Math.cos(lam);
+    sS = Math.sqrt((cU2 * sl) ** 2 + (cU1 * sU2 - sU1 * cU2 * cl) ** 2);
+    if (sS === 0) return 0;
+    cS = sU1 * sU2 + cU1 * cU2 * cl;
+    sig = Math.atan2(sS, cS);
+    const sa = cU1 * cU2 * sl / sS;
+    c2a = 1 - sa * sa;
+    c2m = c2a !== 0 ? cS - 2 * sU1 * sU2 / c2a : 0;
+    const C = F / 16 * c2a * (4 + F * (4 - 3 * c2a));
+    prev = lam;
+    lam = L0 + (1 - C) * F * sa * (sig + C * sS * (c2m + C * cS * (-1 + 2 * c2m * c2m)));
+  } while (Math.abs(lam - prev) > 1e-12 && ++it < 200);
+  if (it >= 200) return map ? map.distance(a, b) : 0;
+  const uSq = c2a * (A * A - B * B) / (B * B);
+  const AA = 1 + uSq / 16384 * (4096 + uSq * (-768 + uSq * (320 - 175 * uSq)));
+  const BB = uSq / 1024 * (256 + uSq * (-128 + uSq * (74 - 47 * uSq)));
+  const dS = BB * sS * (c2m + BB / 4 * (cS * (-1 + 2 * c2m * c2m) - BB / 6 * c2m * (-3 + 4 * sS * sS) * (-3 + 4 * c2m * c2m)));
+  return B * AA * (sig - dS);
+}
+const COMPASS8 = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"];
+const compass8 = (deg) => COMPASS8[Math.floor((((deg % 360) + 360 + 22.5) % 360) / 45)];
+function bearingDeg(a, b) {           // initial bearing a -> b, degrees from north
+  const r = Math.PI / 180, dl = (b.lng - a.lng) * r;
+  const y = Math.sin(dl) * Math.cos(b.lat * r);
+  const x = Math.cos(a.lat * r) * Math.sin(b.lat * r) - Math.sin(a.lat * r) * Math.cos(b.lat * r) * Math.cos(dl);
+  return (Math.atan2(y, x) / r + 360) % 360;
+}
+function pathLength(pts) { let s = 0; for (let i = 1; i < pts.length; i++) s += geoDist(pts[i - 1], pts[i]); return s; }
+function fmtLen(m) { return m < 1000 ? `${m.toFixed(1)} m` : `${(m / 1000).toFixed(3)} km`; }
+
+/* ---------- length + chainage labels along the line ---------- */
+const LABEL_STEPS = [100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000];
+
+function measuredLine() {
+  if (laneLayer && state.centre && state.project) {
+    return { pts: state.centre, startKm: Number(state.project.params.chainage_start_km), total: state.project.summary.length_m };
+  }
+  if (draw.pts.length >= 2) {
+    const v = parseFloat($("#chStart").value);
+    return { pts: draw.pts, startKm: Number.isFinite(v) ? v : 0, total: null };
+  }
+  return null;
+}
+
+function drawMeasurements() {
+  if (!measureLayer) return;
+  measureLayer.clearLayers();
+  const m = measuredLine();
+  if (!m) return;
+  const pts = m.pts, cum = [0];
+  for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + geoDist(pts[i - 1], pts[i]));
+  const total = m.total ?? cum[cum.length - 1];
+  const scale = (m.total && cum[cum.length - 1] > 0) ? cum[cum.length - 1] / m.total : 1;   // stored line: match the backend length
+  const mpp = 40075016.686 * Math.cos(pts[0].lat * Math.PI / 180) / 2 ** (map.getZoom() + 8);  // metres per pixel
+  const labelStep = LABEL_STEPS.find(s => s / mpp >= 90) || LABEL_STEPS[LABEL_STEPS.length - 1];
+  let dotStep = 100 / mpp >= 8 ? 100 : labelStep;
+  if (total / dotStep > 1500) dotStep = labelStep;
+  const dot = { weight: 1, color: "#1C2124", fillColor: "#F2B705", fillOpacity: 1, interactive: false };
+  let seg = 0;
+  for (let d = dotStep; d < total - 1; d += dotStep) {
+    const dd = d * scale;
+    while (seg < cum.length - 2 && cum[seg + 1] < dd) seg++;
+    const f = (dd - cum[seg]) / ((cum[seg + 1] - cum[seg]) || 1);
+    const ll = L.latLng(pts[seg].lat + f * (pts[seg + 1].lat - pts[seg].lat), pts[seg].lng + f * (pts[seg + 1].lng - pts[seg].lng));
+    const isLabel = Math.abs(d / labelStep - Math.round(d / labelStep)) < 1e-9;
+    const c = L.circleMarker(ll, { ...dot, radius: isLabel ? 4 : 2.5 });
+    if (isLabel) c.bindTooltip((m.startKm + d / 1000).toFixed(3), { permanent: true, direction: "right", offset: [6, 0], className: "ch-label" });
+    measureLayer.addLayer(c);
+  }
+  const brg = bearingDeg(pts[0], pts[pts.length - 1]);
+  const ends = [
+    [pts[0], `${m.startKm.toFixed(3)}`, "left"],
+    [pts[pts.length - 1], `${(m.startKm + total / 1000).toFixed(3)} · ${fmtLen(total)}`, "right"],
+  ];
+  for (const [ll, text, dir] of ends) {
+    measureLayer.addLayer(L.circleMarker(ll, { ...dot, radius: 5, fillColor: "#ffffff" })
+      .bindTooltip(text, { permanent: true, direction: dir, offset: [dir === "left" ? -8 : 8, 0], className: "ch-label ch-end" }));
+  }
+}
+
+function onMouseMove(e) {
+  if (!draw.active || !draw.pts.length) { tipEl.hidden = true; return; }
+  const last = draw.pts[draw.pts.length - 1];
+  if (!rubber) rubber = L.polyline([], { color: "#F2B705", weight: 2, dashArray: "4 6", interactive: false }).addTo(map);
+  rubber.setLatLngs([last, e.latlng]);
+  const seg = geoDist(last, e.latlng);
+  tipEl.innerHTML = `${fmtLen(seg)} this segment<br><strong>${fmtLen(pathLength(draw.pts) + seg)}</strong> total`;
+  tipEl.hidden = false;
+  const box = map.getSize(), w = tipEl.offsetWidth, h = tipEl.offsetHeight;   // keep the tip inside the map
+  const x = e.containerPoint.x + 16 + w > box.x ? e.containerPoint.x - 16 - w : e.containerPoint.x + 16;
+  const y = e.containerPoint.y + 16 + h > box.y ? e.containerPoint.y - 16 - h : e.containerPoint.y + 16;
+  tipEl.style.left = `${x}px`;
+  tipEl.style.top = `${y}px`;
+}
+
+/* ---------- drawing ---------- */
+function setDrawing(on) {
+  if (!map) return;
+  draw.active = on;
+  map.getContainer().classList.toggle("drawing", on);
+  if (on) map.doubleClickZoom.disable(); else map.doubleClickZoom.enable();
+  if (!on) { tipEl.hidden = true; if (rubber) rubber.setLatLngs([]); }
+  const b = $("#drawBtn");
+  b.setAttribute("aria-pressed", String(on));
+  b.textContent = on ? "Finish line" : (draw.pts.length ? "Continue line" : "Draw median line");
+  updateDrawInfo();
+}
+
+function onMapClick(e) {
+  if (!draw.active) return;
+  const last = draw.pts[draw.pts.length - 1];
+  if (last && map.distance(last, e.latlng) < 0.5) return;     // second click of a double-click
+  draw.pts.push(e.latlng.wrap());
+  draw.edited = true;
+  redrawLine();
+}
+
+function redrawLine() {
+  if (!map) return;
+  if (!draw.line) draw.line = L.polyline([], { color: "#F2B705", weight: 3, interactive: false }).addTo(map);
+  draw.line.setLatLngs(draw.pts);
+  draw.markers.forEach(m => m.remove());
+  draw.markers = [];
+  if (draw.pts.length <= MAX_EDIT_VERTICES) {
+    let run = 0;
+    draw.pts.forEach((p, i) => {
+      if (i > 0) run += geoDist(draw.pts[i - 1], p);
+      const start = i === 0;
+      const m = L.marker(p, {
+        draggable: true, keyboard: false,
+        icon: L.divIcon({ className: start ? "vtx vtx-start" : "vtx", iconSize: start ? [16, 16] : [11, 11] }),
+      }).addTo(map);
+      m.on("drag", ev => { draw.pts[i] = ev.target.getLatLng(); draw.edited = true; draw.line.setLatLngs(draw.pts); updateDrawInfo(); });
+      m.on("dragend", () => redrawLine());
+      draw.markers.push(m);
+    });
+  }
+  updateDrawInfo();
+  drawMeasurements();
+}
+
+function updateDrawInfo() {
+  const el = $("#drawInfo");
+  if (draw.file) { el.textContent = `${draw.file.name} selected. It will be used as the median line.`; return; }
+  const n = draw.pts.length, len = pathLength(draw.pts);
+  const v = parseFloat($("#chStart").value), ch0 = Number.isFinite(v) ? v : 0;
+  if (draw.active) {
+    el.textContent = n
+      ? `${n} points, ${fmtLen(len)}. Keep clicking along the road centre; double-click or press Finish line to stop.`
+      : "Click on the map where the chainage starts, then click along the road centre.";
+  } else if (n >= 2) {
+    el.textContent = `Median line: ${n} points, length ${fmtLen(len)}, chainage ${ch0.toFixed(3)} to ${(ch0 + len / 1000).toFixed(3)}. Drag points to adjust.`
+      + (n > MAX_EDIT_VERTICES ? " (Too many points to edit by dragging.)" : "");
+  } else {
+    el.textContent = "Zoom to the road, press Draw median line, then click along the road centre from the chainage start.";
+  }
+}
+
+function clearDrawing() {
+  if (map) setDrawing(false);
+  draw.pts = []; draw.file = null; draw.sourceFile = null; draw.edited = false;
+  if (draw.line) { draw.line.remove(); draw.line = null; }
+  if (rubber) { rubber.remove(); rubber = null; }
+  draw.markers.forEach(m => m.remove()); draw.markers = [];
+  $("#kmlFile").value = "";
+  updateDrawInfo();
+  drawMeasurements();
+  if (map) $("#drawBtn").textContent = "Draw median line";
+}
+
+$("#drawBtn").addEventListener("click", () => {
+  if (draw.file) { draw.file = null; $("#kmlFile").value = ""; }
+  setDrawing(!draw.active);
+});
+$("#undoBtn").addEventListener("click", () => { draw.pts.pop(); draw.edited = true; redrawLine(); setDrawing(draw.active); });
+$("#reverseBtn").addEventListener("click", () => { draw.pts.reverse(); draw.edited = true; redrawLine(); });
+$("#clearBtn").addEventListener("click", clearDrawing);
+$("#chStart").addEventListener("input", () => { updateDrawInfo(); drawMeasurements(); });
+
+$("#searchForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const q = $("#searchBox").value.trim();
+  if (!q || !map) return;
+  const m = q.match(/^\s*(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)\s*$/);
+  if (m) { map.setView([Number(m[1]), Number(m[2])], 17); return; }
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`);
+    const hits = await r.json();
+    if (!hits.length) { message($("#s1msg"), "warn", `<p>No place found for “${esc(q)}”.</p>`); return; }
+    const h = hits[0];
+    if (h.boundingbox) map.fitBounds([[+h.boundingbox[0], +h.boundingbox[2]], [+h.boundingbox[1], +h.boundingbox[3]]], { maxZoom: 17 });
+    else map.setView([+h.lat, +h.lon], 15);
+    message($("#s1msg"), "", "");
+  } catch (err) {
+    message($("#s1msg"), "err", "<p>Place search is unavailable. Type coordinates as lat, lon instead.</p>");
+  }
+});
+
+/* KML upload: a .kml is loaded onto the map so it can be checked, measured and edited */
+function parseKmlLine(text) {
+  const doc = new DOMParser().parseFromString(text, "application/xml");
+  let nodes = [...doc.getElementsByTagNameNS("*", "LineString")].flatMap(ls => [...ls.getElementsByTagNameNS("*", "coordinates")]);
+  if (!nodes.length) nodes = [...doc.getElementsByTagNameNS("*", "coordinates")];
+  if (!nodes.length) return null;
+  const pts = nodes[0].textContent.trim().split(/\s+/).map(t => t.split(",").map(Number))
+    .filter(a => a.length >= 2 && Number.isFinite(a[0]) && Number.isFinite(a[1]));
+  return pts.length >= 2 ? pts : null;
+}
+
+$("#kmlFile").addEventListener("change", async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  if (map) setDrawing(false);
+  message($("#s1msg"), "", "");
+  if (!$("#pName").value) $("#pName").value = f.name.replace(/\.km[lz]$/i, "");
+  if (f.name.toLowerCase().endsWith(".kml") && map) {
+    const pts = parseKmlLine(await f.text());
+    if (!pts) { message($("#s1msg"), "err", "<p>No line found in this KML.</p>"); return; }
+    draw.file = null; draw.sourceFile = f; draw.edited = false;
+    draw.pts = pts.map(([lon, lat]) => L.latLng(lat, lon));
+    redrawLine();
+    map.fitBounds(draw.line.getBounds(), { padding: [36, 36], maxZoom: 18 });
+    $("#drawBtn").textContent = "Continue line";
+  } else {
+    draw.pts = []; redrawLine();
+    draw.file = f;
+    updateDrawInfo();
+  }
+});
+
+function buildKml(pts, name) {
+  const coords = pts.map(p => `${p.lng.toFixed(8)},${p.lat.toFixed(8)},0`).join(" ");
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"><Document>
+<Placemark><LineString><tessellate>1</tessellate>
+<coordinates>${coords}</coordinates></LineString></Placemark></Document></kml>`;
+}
+
+/* ---------- step 1 submit ---------- */
+$("#laneForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (draw.active) setDrawing(false);
+  if (!state.cfg && !(await connectBackend())) {
+    message($("#s1msg"), "err", `<p>Can't reach the backend at ${esc(backendUrl())}. See the message at the top of the page.</p>`);
+    return;
+  }
+  const fd = new FormData();
+  let name = $("#pName").value.trim();
+  if (draw.file) {
+    fd.append("kml", draw.file);                                  // KMZ, sent as uploaded
+  } else if (draw.sourceFile && !draw.edited) {
+    fd.append("kml", draw.sourceFile);                            // KML, unchanged
+  } else if (draw.pts.length >= 2) {
+    if (!name) name = `Median line ${(pathLength(draw.pts) / 1000).toFixed(2)} km`;
+    fd.append("kml", new Blob([buildKml(draw.pts, name)], { type: "application/vnd.google-earth.kml+xml" }), "median_line_drawn.kml");
+  } else {
+    message($("#s1msg"), "err", "<p>Draw the median line on the map (at least two points) or upload a KML first.</p>");
+    return;
+  }
+  fd.append("name", name);
+  fd.append("chainage_start_km", $("#chStart").value);
+  fd.append("median_offset_m", $("#medOff").value);
+  fd.append("lane_count", $("#lanes").value);
+  const btn = $("#laneBtn");
+  busy(btn, true); message($("#s1msg"), "", "");
+  try {
+    const data = await api("/api/projects", { method: "POST", body: fd });
+    state.replacing = null;
+    applyProject(data);
+  } catch (err) {
+    message($("#s1msg"), "err", `<p>${esc(err.message)}</p>`);
+  } finally { busy(btn, false); }
+});
+
+async function openProject(pid) {
+  const data = await api(`/api/projects/${pid}`);
+  state.replacing = null;
+  applyProject(data);
+}
+
+function applyProject(data) {
+  const p = data.project, s = p.summary, prm = p.params;
+  const switching = state.project?.id !== p.id;
+  state.project = p; state.runs = data.runs; state.reports = data.reports;
+
+  $("#laneForm").hidden = true; $("#laneResult").hidden = false; $("#replaceNote").hidden = true;
+  $("#mapTools").hidden = true; $("#drawInfo").hidden = true;
+  clearDrawing();
+  const st = $("#s1status");
+  st.textContent = `Stored. ${s.lane_tags.length} lanes, ${s.bins_per_lane} bins of 100 m per lane.`; st.className = "status ok";
+  const perSide = s.lane_tags.filter(t => t.startsWith("LHS")).map(t => t.split("_")[1]).join(", ");
+  const facts = [
+    ["Project", p.name],
+    ["Length", `${(s.length_m / 1000).toFixed(3)} km`],
+    ["Chainage", `${s.chainage_start_km.toFixed(3)} to ${s.chainage_end_km.toFixed(3)}`],
+    ["Lanes", `${s.lane_tags.length} (${perSide} each side)`],
+    ["Median offset", `${prm.median_offset_m} m each side`],
+    ["Lane width", `${prm.lane_width_m} m`],
+    ["Points", `${s.points} at ${prm.interval_m} m`],
+    ...(s.orientation ? [["Imagery direction", dirText(s.orientation)]] : []),
+  ];
+  $("#facts").innerHTML = facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("");
+  $("#kmlZip").href = u(data.kml_zip_url);
+  $("#lineKml").href = u(`/api/projects/${p.id}/files/input/median_line.kml`);
+  showLanesOnMap(p.id);
+
+  updateDirectionLabels(p);
+  lockStep(2, false);
+  if (switching) {
+    state.checked = null; $("#ndwiBtn").disabled = true; $("#checkResult").innerHTML = ""; $("#reportBox").hidden = true;
+    $("#taskBox").hidden = true;
+  }
+  renderRuns();
+  renderOldReports();
+  if (data.active_task) startPolling(data.active_task);
+  else if (switching) checkDates();
+}
+
+async function showLanesOnMap(pid) {
+  if (!map) return;
+  const gj = await api(`/api/projects/${pid}/geojson`);
+  const styles = {
+    centre: { color: "#F2B705", weight: 2, dashArray: "6 6" },
+    median: { color: "#E6E9E7", weight: 2 },
+    lhs: { color: "#5AA2F0", weight: 2 },
+    rhs: { color: "#4CC3B0", weight: 2 },
+  };
+  if (laneLayer) laneLayer.remove();
+  laneLayer = L.geoJSON(gj, {
+    style: f => styles[f.properties.kind] || styles.median,
+  }).addTo(map);
+  const centre = gj.features.find(f => f.properties.kind === "centre");
+  state.centre = centre ? centre.geometry.coordinates.map(([lon, lat]) => L.latLng(lat, lon)) : null;
+  setTimeout(() => { map.invalidateSize(); fitAll(); drawMeasurements(); }, 60);
+}
+
+/* ---------- step 2 (cloud fixed at 40 %, checked automatically) ---------- */
+let checkTimer = null, checkSeq = 0;
+function scheduleCheck() {
+  clearTimeout(checkTimer);
+  state.checked = null; $("#ndwiBtn").disabled = true;
+  checkTimer = setTimeout(checkDates, 600);
+}
+["#dStart", "#dEnd"].forEach(id => $(id).addEventListener("change", scheduleCheck));
+
+async function checkDates() {
+  if (!state.project) return;
+  const start = $("#dStart").value, end = $("#dEnd").value;
+  if (!start || !end) { message($("#checkResult"), "err", "<p>Set both a start and an end date.</p>"); return; }
+  const seq = ++checkSeq;
+  state.checked = null; $("#ndwiBtn").disabled = true;
+  $("#s2status").textContent = "Checking Sentinel-2 captures…"; $("#s2status").className = "status";
+  try {
+    const q = new URLSearchParams({ start, end, cloud: state.cfg.cloud });
+    const r = await api(`/api/projects/${state.project.id}/s2-dates?${q}`);
+    if (seq !== checkSeq) return;
+    state.checked = r.available ? { start, end } : null;
+    $("#ndwiBtn").disabled = !r.available || !!state.poll;
+    $("#s2status").textContent = r.available ? "Captures found. Ready to generate." : "No capture in this range.";
+    $("#s2status").className = r.available ? "status ok" : "status";
+    renderCheck(r);
+  } catch (err) {
+    if (seq !== checkSeq) return;
+    $("#s2status").textContent = "Capture check failed.";
+    message($("#checkResult"), "err", `<p>${esc(err.message)}</p>`);
+  }
+}
+
+function renderCheck(r) {
+  const el = $("#checkResult");
+  if (r.available) {
+    const list = r.captures.map(c => `${c.date} (cloud ${c.cloud}%, ${c.scenes} scene${c.scenes > 1 ? "s" : ""})`).join("; ");
+    message(el, "ok", `<p><strong>${r.captures.length} capture day${r.captures.length > 1 ? "s" : ""}</strong> between ${r.start} and ${r.end}.</p>
+      <p class="num">${esc(list)}</p>
+      <p>NDWI uses the median of these captures for every bin.</p>`);
+    return;
+  }
+  const near = [...r.nearest_before, ...r.nearest_after].sort((a, b) => a.days_away - b.days_away);
+  if (!near.length) {
+    message(el, "err", `<p>No Sentinel-2 capture between ${r.start} and ${r.end} with less than ${r.cloud}% cloud, and none within ${r.search_days} days either side.</p>
+      <p>Choose another period.</p>`);
+    return;
+  }
+  const chip = (c) => {
+    const side = c.date < r.start ? "before" : "after";
+    return `<button type="button" class="chip" data-date="${c.date}"><strong class="num">${c.date}</strong>${c.days_away} day${c.days_away > 1 ? "s" : ""} ${side}, cloud ${c.cloud}%</button>`;
+  };
+  message(el, "warn", `<p>No Sentinel-2 capture between ${r.start} and ${r.end}. Nearest captures (select one to use it):</p>
+    <div class="chips">${near.map(chip).join("")}</div>`);
+  el.querySelectorAll(".chip").forEach(b => b.addEventListener("click", () => {
+    $("#dStart").value = b.dataset.date; $("#dEnd").value = b.dataset.date; checkDates();
+  }));
+}
+
+$("#ndwiBtn").addEventListener("click", async () => {
+  if (!state.checked) return;
+  const btn = $("#ndwiBtn");
+  busy(btn, true);
+  try {
+    const r = await api(`/api/projects/${state.project.id}/ndwi`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ start: state.checked.start, end: state.checked.end, cloud: state.cfg.cloud }),
+    });
+    startPolling(r.task_id);
+  } catch (err) {
+    message($("#checkResult"), "err", `<p>${esc(err.message)}</p>`);
+    busy(btn, false);
+  }
+});
+
+function stopPolling() { if (state.poll) { clearInterval(state.poll); state.poll = null; } }
+
+function startPolling(tid) {
+  stopPolling();
+  $("#taskBox").hidden = false;
+  busy($("#ndwiBtn"), true);
+  const pid = state.project.id;
+  const tick = async () => {
+    let t;
+    try { t = await api(`/api/tasks/${tid}`); }
+    catch (err) { stopPolling(); $("#taskStatus").textContent = err.message; return finishTask(); }
+    if (state.project?.id !== pid) return stopPolling();
+    const pct = t.total ? Math.round(100 * t.done / t.total) : 0;
+    $("#bar").style.width = `${pct}%`;
+    $("#taskStatus").textContent = t.status === "error" ? `Stopped: ${t.error}`
+      : t.status === "done" ? `Done. ${t.result.n_images} images stored, ${t.result.failed} bins skipped.`
+      : `Generating NDWI images: ${t.done} of ${t.total || "…"} steps (${pct}%).`;
+    const log = $("#taskLog");
+    log.textContent = t.log.slice(-60).join("\n");
+    log.scrollTop = log.scrollHeight;
+    if (t.status === "done" || t.status === "error") { stopPolling(); finishTask(); }
+  };
+  tick();
+  state.poll = setInterval(tick, 2000);
+}
+
+async function finishTask() {
+  busy($("#ndwiBtn"), false); $("#ndwiBtn").disabled = !state.checked;
+  const data = await api(`/api/projects/${state.project.id}`);
+  state.runs = data.runs; state.reports = data.reports;
+  renderRuns();
+}
+
+function latestRun() {
+  const done = (state.runs || []).filter(r => r.status === "done");
+  return done.sort((a, b) => String(b.finished || b.created).localeCompare(String(a.finished || a.created)))[0] || null;
+}
+
+function renderRuns() {
+  const runs = state.runs || [];
+  $("#runsBox").hidden = !runs.length;
+  $("#runsList").innerHTML = runs.map(r => {
+    const info = r.status === "done"
+      ? `${r.n_images} images${r.failed?.length ? `, ${r.failed.length} bins skipped` : ""}`
+      : esc(r.error || "");
+    return `<li><span class="num"><strong>${r.start} to ${r.end}</strong></span>
+      <span class="tag ${esc(r.status)}">${esc(r.status)}</span><span class="status">${info}</span>
+      ${r.status === "done" ? `<a href="${u(r.zip_url)}">Download images (ZIP)</a>` : ""}</li>`;
+  }).join("");
+  const latest = latestRun();
+  if (latest) {
+    lockStep(3, false);
+    $("#s3status").textContent = `Uses the latest NDWI images: ${latest.start} to ${latest.end}, ${latest.n_images} images.`;
+    $("#s3status").className = "status";
+  } else {
+    lockStep(3, true, "Needs NDWI images first.");
+  }
+}
+
+function renderOldReports() {
+  const reps = state.reports || [];
+  $("#oldReports").hidden = !reps.length;
+  $("#oldReportsList").innerHTML = reps.map(r => `<li><a href="${u(r.url)}">${esc(r.name)}</a></li>`).join("");
+}
+
+/* ---------- step 3 ---------- */
+$("#roughBtn").addEventListener("click", async () => {
+  const btn = $("#roughBtn");
+  busy(btn, true); message($("#s3msg"), "", "");
+  try {
+    const r = await api(`/api/projects/${state.project.id}/roughness`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mode: document.querySelector('input[name="mode"]:checked').value,
+        surface: $("#surface").value,
+      }),
+    });
+    state.report = r;
+    const m = r.reports["100m"].meta;
+    $("#s3status").textContent = `RI JSON ready: ${r.reports["100m"].rows.length} sections of 100 m and ${r.reports["10m"].rows.length} of 10 m, ${m["Pavement"]}, imagery direction ${m["Road direction"]}.`;
+    $("#s3status").className = "status ok";
+    $("#reportBox").hidden = false;
+    renderReport();
+    if (r.skipped.length) message($("#s3msg"), "warn", `<p>${r.skipped.length} image(s) skipped because the name had no direction or lane.</p>`);
+    const data = await api(`/api/projects/${state.project.id}`);
+    state.reports = data.reports; renderOldReports();
+  } catch (err) {
+    message($("#s3msg"), "err", `<p>${esc(err.message)}</p>`);
+  } finally { busy(btn, false); }
+});
+
+document.querySelectorAll('input[name="res"]').forEach(i => i.addEventListener("change", (e) => {
+  state.res = e.target.value; renderReport();
+}));
+
+const COLS = [
+  ["Chainage_Start", "r", 3], ["Chainage_End", "r", 3], ["Direction"], ["Lane"], ["RI", "r", 2], ["IRI", "r", 3],
+  ["IRI_Index"], ["RI_Index"], ["Drainage Condition:"], ["Carriage Type "], ["Survey_Date_Start"], ["Survey_Date_End"],
+  ["From Latitude", "r", 8], ["From Longitude", "r", 8], ["To Latitude", "r", 8], ["To Longitude", "r", 8], ["Roughness_Status"],
+];
+const HEAD = { Direction: "Side" };   // display-only header rename; the data key stays "Direction"
+
+$("#copyJson").addEventListener("click", () => navigator.clipboard.writeText($("#jsonOut").textContent));
+
+function current() { return state.report.reports[state.res]; }
+
+function renderReport() {
+  const r = current();
+  $("#tableTitle").textContent = `${r.meta["Section length"]} sections`;
+  $("#jsonRes").textContent = r.meta["Section length"];
+  $("#jsonOut").textContent = JSON.stringify(r.ri_json, null, 2);
+  $("#sumTable").innerHTML = `<thead><tr><th>Side</th><th>Lane</th><th class="r">Segments</th><th class="r">Avg RI</th><th class="r">Avg IRI</th><th class="r">Good</th><th class="r">Fair</th><th class="r">Poor</th></tr></thead><tbody>` +
+    r.summary.map(s => `<tr><td>${esc(s.Direction)}</td><td>${esc(s.Lane)}</td><td class="r">${s.Segments}</td><td class="r">${fmt(s["Avg RI"], 2)}</td><td class="r">${fmt(s["Avg IRI"], 3)}</td><td class="r">${s.Good}</td><td class="r">${s.Fair}</td><td class="r">${s.Poor}</td></tr>`).join("") + "</tbody>";
+
+  $("#repTable").innerHTML = `<thead><tr>${COLS.map(([c, a]) => `<th class="${a || ""}">${esc(HEAD[c] || c.replace(/_/g, " ").trim())}</th>`).join("")}</tr></thead><tbody>` +
+    r.rows.map((row, i) => `<tr data-i="${i}">${COLS.map(([c, a, d]) => {
+      const v = row[c];
+      if (c === "Drainage Condition:") return `<td><span class="pill ${esc(v)}">${esc(v)}</span></td>`;
+      return `<td class="${a || ""}">${d !== undefined ? fmt(v, d) : esc(v)}</td>`;
+    }).join("")}</tr>`).join("") + "</tbody>";
+  $("#repTable tbody").addEventListener("click", (e) => {
+    const tr = e.target.closest("tr"); if (tr) showRow(Number(tr.dataset.i), false);
+  });
+  renderRoad(r);
+  $("#preview").hidden = true;
+}
+
+function laneOrder(tags) {
+  const num = t => Number(t.split("_L")[1]);
+  return {
+    lhs: tags.filter(t => t.startsWith("LHS")).sort((a, b) => num(b) - num(a)),
+    rhs: tags.filter(t => t.startsWith("RHS")).sort((a, b) => num(a) - num(b)),
+  };
+}
+
+function renderRoad(r) {
+  const desc = state.report.descending ?? state.report.mode === "down_to_up";   // heading against chainage -> 10 -> 0
+  const starts = [...new Set(r.rows.map(x => x.Chainage_Start))].sort((a, b) => desc ? b - a : a - b);
+  const index = new Map(r.rows.map((x, i) => [`${x.Direction}_${x.Lane}|${x.Chainage_Start}`, i]));
+  const { lhs, rhs } = laneOrder(state.report.lane_tags);
+  const lane = (tag) => `<div class="lane"><div class="lane-label">${esc(tag.replace("_", " "))}</div><div class="track">` +
+    starts.map(cs => {
+      const i = index.get(`${tag}|${cs}`);
+      if (i === undefined) return `<span class="cell" title="${cs.toFixed(3)}: no image"></span>`;
+      const x = r.rows[i];
+      return `<button type="button" class="cell ${esc(x["Drainage Condition:"])}" data-i="${i}" title="${tag.replace("_", " ")}, ${x.Chainage_Start.toFixed(3)} to ${x.Chainage_End.toFixed(3)} km: RI ${fmt(x.RI, 2)}, IRI ${fmt(x.IRI, 3)}, ${x["Drainage Condition:"]}"></button>`;
+    }).join("") + `</div></div>`;
+  const ticks = [];
+  const n = Math.min(6, starts.length);
+  for (let k = 0; k < n; k++) ticks.push(starts[Math.round(k * (starts.length - 1) / Math.max(1, n - 1))]);
+  const last = r.rows.reduce((m, x) => desc ? Math.min(m, x.Chainage_End) : Math.max(m, x.Chainage_End), desc ? Infinity : -Infinity);
+  if (ticks.length) ticks[ticks.length - 1] = last;
+  $("#road").innerHTML = `
+    <div class="road-head"><span><strong>Imagery direction: ${esc(r.meta["Road direction"])}</strong>, ${starts.length} sections of ${esc(r.meta["Section length"])}</span>
+      <span class="legend"><span style="--c:#3DA068">Good</span><span style="--c:#E2B32A">Fair</span><span style="--c:#D9483B">Poor</span></span></div>
+    <div class="road-scroll"><div style="min-width:${starts.length * 4 + 80}px">
+      ${lhs.map(lane).join("")}
+      <div class="centre"><div></div><div></div></div>
+      ${rhs.map(lane).join("")}
+      <div class="ticks"><div></div><div class="scale num">${ticks.map(t => `<span>${t.toFixed(3)}</span>`).join("")}</div></div>
+    </div></div>`;
+  $("#road").querySelectorAll("button.cell").forEach(b => b.addEventListener("click", () => showRow(Number(b.dataset.i), true)));
+}
+
+function showRow(i, scroll) {
+  const x = current().rows[i];
+  document.querySelectorAll("#repTable tr.sel, #road .cell.sel").forEach(el => el.classList.remove("sel"));
+  const tr = document.querySelector(`#repTable tr[data-i="${i}"]`);
+  if (tr) { tr.classList.add("sel"); if (scroll) tr.scrollIntoView({ block: "nearest" }); }
+  const cell = document.querySelector(`#road .cell[data-i="${i}"]`);
+  if (cell) cell.classList.add("sel");
+  $("#preview").hidden = false;
+  $("#previewImg").src = u(x._image);
+  $("#previewImg").alt = `NDWI image for ${x.Direction} ${x.Lane}, chainage ${x.Chainage_Start.toFixed(3)} to ${x.Chainage_End.toFixed(3)}`;
+  const note = state.res === "10m" ? " The image shows the whole 100 m bin this 10 m section belongs to." : "";
+  $("#previewCap").textContent = `${x.Direction} ${x.Lane}, ${x.Chainage_Start.toFixed(3)} to ${x.Chainage_End.toFixed(3)} km. RI ${fmt(x.RI, 2)}, IRI ${fmt(x.IRI, 3)}, ${x["Drainage Condition:"]}. ${x.Roughness_Status}.${note}`;
+}
+
+init().catch(err => message($("#s1msg"), "err", `<p>${esc(err.message)}</p>`));
+</script>
+</body>
+</html>

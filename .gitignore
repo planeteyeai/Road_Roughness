@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+*.cover
+*.log
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Project specific
+storage/
+*.kml
+*.kmz
+*.xlsx
+*.jpg
+*.jpeg
+*.png
+*.pdf
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Vercel
+.vercel
