@@ -30,10 +30,11 @@ RUN pip install --no-cache-dir --upgrade pip && \
 FROM python:3.10-slim
 
 # Install only runtime dependencies (no build tools)
+# Using wildcard versions to work with any Debian version
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgeos-c1v5 \
-    libproj25 \
-    libgdal30 \
+    libgeos-c1* \
+    libproj[0-9]* \
+    libgdal[0-9]* \
     libgl1 \
     libglib2.0-0 \
     libgomp1 \
