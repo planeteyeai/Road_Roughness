@@ -1,0 +1,202 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+road_roughness/backend/.venv/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+!.env.docker.example
+road_roughness/backend/.env
+*.env
+
+# Service account credentials (IMPORTANT - Never commit these!)
+*service-account*.json
+*serviceaccount*.json
+*credentials*.json
+*.json.key
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+*.sublime-project
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+*.bak
+
+# Logs
+*.log
+*.log.*
+logs/
+*.pid
+*.seed
+*.pid.lock
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.hypothesis/
+.cache/
+nosetests.xml
+coverage.xml
+*.cover
+.pytest_cache/
+
+# Project storage - Keep structure but exclude data
+road_roughness/backend/storage/
+!road_roughness/backend/storage/.gitkeep
+# Exclude generated files in storage
+*.kml
+*.kmz
+# But allow example/input KML files if needed
+!*example*.kml
+!*median_line*.kml
+
+# Temporary files
+*.tmp
+*.temp
+*~
+.#*
+\#*#
+
+# Build artifacts
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Documentation build
+docs/_build/
+site/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# Local development
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Node (if any frontend build tools added later)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Docker (keep configs, ignore builds)
+*.tar
+*.tar.gz
+
+# Railway (local CLI files)
+.railway/
+
+# Backup files
+*.backup
+*_backup
+*.old
+
+# Large files that shouldn't be in git
+*.mp4
+*.avi
+*.mov
+*.wmv
+*.flv
+*.zip
+*.rar
+*.7z
+*.tar.gz
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Sensitive data markers
+*secret*
+*private*
+*password*
+*token*
+!*password.example*
+!*token.example*
