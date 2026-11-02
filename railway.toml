@@ -1,0 +1,8 @@
+[build]
+builder = "NIXPACKS"
+buildCommand = "pip install -r road_roughness/backend/requirements.txt"
+
+[deploy]
+startCommand = "cd road_roughness/backend && python main.py"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

@@ -1,0 +1,89 @@
+════════════════════════════════════════════════════════════════════════
+  COPY THIS TO RAILWAY DASHBOARD → VARIABLES → RAW EDITOR
+════════════════════════════════════════════════════════════════════════
+
+Step 1: Replace YOUR_SERVICE_ACCOUNT_JSON_HERE with actual JSON
+Step 2: Copy everything below this line
+Step 3: Paste in Railway Raw Editor
+
+────────────────────────────────────────────────────────────────────────
+
+GEE_PROJECT=arctic-hybrid-462806-c9
+GEE_SERVICE_ACCOUNT_JSON=YOUR_SERVICE_ACCOUNT_JSON_HERE
+RR_HOST=0.0.0.0
+RR_PORT=8000
+CORS_ORIGINS=*
+SERVE_FRONTEND=true
+FRONTEND_DIR=../frontend
+KEEP_ONLY_LATEST_PROJECT=true
+DEFAULT_CLOUD_PCT=40
+NEAREST_SEARCH_DAYS=90
+NDWI_WORKERS=4
+DEFAULT_CHAINAGE_START_KM=0.000
+DEFAULT_INTERVAL_M=1.0
+DEFAULT_MEDIAN_OFFSET_M=1.0
+DEFAULT_LANE_COUNT=4
+DEFAULT_LANE_WIDTH_M=3.40
+DEFAULT_BIN_KM=0.100
+
+────────────────────────────────────────────────────────────────────────
+
+IMPORTANT NOTES:
+
+1. GEE_SERVICE_ACCOUNT_JSON:
+   - Get your service account JSON from Google Cloud Console
+   - Open the JSON file in a text editor
+   - Copy the ENTIRE content (starts with { ends with })
+   - Replace YOUR_SERVICE_ACCOUNT_JSON_HERE with the actual JSON
+   - Should look like: {"type":"service_account","project_id":"..."}
+
+2. GEE_PROJECT:
+   - Current value: arctic-hybrid-462806-c9
+   - Change this if you want to use a different Google Cloud project
+
+3. RR_HOST:
+   - MUST be 0.0.0.0 for Railway (NOT 127.0.0.1)
+   - This is already set correctly above
+
+4. CORS_ORIGINS:
+   - Currently set to * (allows all domains)
+   - For production, change to your domain:
+     CORS_ORIGINS=https://your-app.railway.app
+
+════════════════════════════════════════════════════════════════════════
+  HOW TO GET SERVICE ACCOUNT JSON
+════════════════════════════════════════════════════════════════════════
+
+Step 1: Create Service Account
+   1. Go to: https://console.cloud.google.com
+   2. Select project: arctic-hybrid-462806-c9 (or your project)
+   3. IAM & Admin → Service Accounts
+   4. CREATE SERVICE ACCOUNT
+   5. Name: railway-road-roughness
+   6. CREATE AND CONTINUE → DONE
+
+Step 2: Create Key
+   1. Click on the service account
+   2. Keys tab → ADD KEY → Create new key
+   3. Choose: JSON
+   4. CREATE (file downloads)
+
+Step 3: Register with Earth Engine
+   1. Go to: https://code.earthengine.google.com
+   2. Register the service account email (from the JSON file)
+
+Step 4: Copy JSON
+   1. Open the downloaded JSON file
+   2. Select ALL content (Ctrl+A or Cmd+A)
+   3. Copy (Ctrl+C or Cmd+C)
+   4. Paste to replace YOUR_SERVICE_ACCOUNT_JSON_HERE above
+
+════════════════════════════════════════════════════════════════════════
+  EXAMPLE (What the JSON looks like)
+════════════════════════════════════════════════════════════════════════
+
+GEE_SERVICE_ACCOUNT_JSON={"type":"service_account","project_id":"arctic-hybrid-462806-c9","private_key_id":"abc123...","private_key":"-----BEGIN PRIVATE KEY-----\nMIIE...\n-----END PRIVATE KEY-----\n","client_email":"railway-road-roughness@arctic-hybrid-462806-c9.iam.gserviceaccount.com","client_id":"123456789","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs","client_x509_cert_url":"https://www.googleapis.com/robot/v1/metadata/x509/..."}
+
+Note: The JSON should be on ONE line with NO line breaks
+
+════════════════════════════════════════════════════════════════════════

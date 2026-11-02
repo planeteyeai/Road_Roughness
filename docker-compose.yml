@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  road-roughness:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - RR_HOST=0.0.0.0
+      - RR_PORT=8000
+      - CORS_ORIGINS=*
+      - SERVE_FRONTEND=true
+      - FRONTEND_DIR=../frontend
+      - KEEP_ONLY_LATEST_PROJECT=true
+      - DEFAULT_CLOUD_PCT=40
+      - NEAREST_SEARCH_DAYS=90
+      - NDWI_WORKERS=4
+      # Set these in .env file or here:
+      - GEE_PROJECT=${GEE_PROJECT}
+      - GEE_SERVICE_ACCOUNT_JSON=${GEE_SERVICE_ACCOUNT_JSON}
+    volumes:
+      # Persist storage data
+      - ./storage:/app/road_roughness/backend/storage
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/config')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

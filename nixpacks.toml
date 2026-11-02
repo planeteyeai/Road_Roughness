@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ["python310", "gcc", "g++", "geos", "proj", "gdal"]
+
+[phases.install]
+cmds = ["pip install -r road_roughness/backend/requirements.txt"]
+
+[start]
+cmd = "cd road_roughness/backend && python main.py"

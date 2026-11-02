@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Road roughness survey</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wrap masthead-inner">
+    <div>
+      <h1>Road roughness survey</h1>
+      <p>Draw the median line on satellite imagery, pull Sentinel-2 NDWI for every 100 m bin, and get RI / IRI reports at 100 m and 10 m.</p>
+    </div>
+    <img class="logo" src="logo.png" alt="Company logo" onerror="this.hidden=true">
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="conn" id="conn" role="alert" hidden></div>
+
+  <!-- STEP 1 -->
+  <section class="step" id="step1">
+    <div class="plate" aria-hidden="true">1</div>
+    <div class="step-body">
+      <div class="step-head">
+        <h2>Lane KMLs</h2>
+        <p class="status" id="s1status">Draw the median line on the map, or upload a KML.</p>
+      </div>
+
+      <div class="maptools" id="mapTools">
+        <button type="button" class="btn small" id="drawBtn" aria-pressed="false">Draw median line</button>
+        <button type="button" class="btn small" id="undoBtn">Undo point</button>
+        <button type="button" class="btn small" id="reverseBtn">Reverse direction</button>
+        <button type="button" class="btn small" id="clearBtn">Clear</button>
+        <form class="search" id="searchForm">
+          <input id="searchBox" placeholder="Find a place, or type lat, lon" aria-label="Find a place or coordinates">
+          <button type="submit" class="btn small">Go</button>
+        </form>
+      </div>
+      <div id="map" role="application" aria-label="Satellite map for drawing the median line"></div>
+      <p class="drawinfo num" id="drawInfo" aria-live="polite"></p>
+      <p class="hint" id="mapHint" hidden></p>
+
+      <form id="laneForm" novalidate>
+        <div class="upload">
+          <label for="kmlFile">Or upload the median line (KML or KMZ)</label>
+          <input type="file" id="kmlFile" accept=".kml,.kmz">
+        </div>
+        <div class="grid" style="margin-top:1.25rem">
+          <div class="field">
+            <label for="pName">Project name</label>
+            <input id="pName" placeholder="Optional">
+          </div>
+          <div class="field">
+            <label for="chStart">Chainage start (km)</label>
+            <input id="chStart" type="number" step="0.001" required>
+          </div>
+          <div class="field">
+            <label for="medOff">Median offset (m)</label>
+            <input id="medOff" type="number" step="0.001" min="0" required>
+            <span class="hint">Each side of the centre line</span>
+          </div>
+          <div class="field">
+            <label for="lanes">Road lanes</label>
+            <select id="lanes">
+              <option value="2">2-lane road (L1 each side)</option>
+              <option value="4">4-lane road (L1, L2)</option>
+              <option value="6">6-lane road (L1, L2, L3)</option>
+            </select>
+          </div>
+        </div>
+        <div class="actions">
+          <button type="submit" class="btn primary" id="laneBtn">Save line and generate lane KMLs</button>
+        </div>
+        <div class="msg warn replace-note" id="replaceNote" hidden>
+          <p id="replaceText"></p>
+          <p><button type="button" class="linkbtn" id="backBtn">Keep the current project</button></p>
+        </div>
+        <div id="s1msg"></div>
+      </form>
+
+      <div id="laneResult" hidden>
+        <dl class="facts" id="facts"></dl>
+        <div class="actions">
+          <a class="btn" id="kmlZip" href="#">Download KMLs and Excels (ZIP)</a>
+          <a class="btn" id="lineKml" href="#">Download median line KML</a>
+          <button type="button" class="linkbtn" id="newProjectBtn">Start a new project (replaces this one)</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="step" id="step2" aria-disabled="true">
+    <div class="plate" aria-hidden="true">2</div>
+    <div class="step-body">
+      <div class="step-head">
+        <h2>Sentinel-2 NDWI images</h2>
+        <p class="status" id="s2status">Needs lane KMLs first.</p>
+      </div>
+      <div class="grid">
+        <div class="field"><label for="dStart">Start date</label><input id="dStart" type="date"></div>
+        <div class="field"><label for="dEnd">End date</label><input id="dEnd" type="date"></div>
+      </div>
+      <p class="hint" style="margin-top:.5rem">Only captures with less than 40% cloud are used. Captures are checked as soon as you change a date.</p>
+      <div id="checkResult"></div>
+      <div class="actions">
+        <button type="button" class="btn primary" id="ndwiBtn" disabled>Generate NDWI images</button>
+      </div>
+      <div id="taskBox" hidden>
+        <div class="progress" aria-hidden="true"><div id="bar"></div></div>
+        <p class="status num" id="taskStatus" style="margin-top:.5rem" aria-live="polite"></p>
+        <pre class="log" id="taskLog"></pre>
+      </div>
+      <div id="runsBox" hidden>
+        <h3>Stored image sets</h3>
+        <ul class="runs" id="runsList"></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="step" id="step3" aria-disabled="true">
+    <div class="plate" aria-hidden="true">3</div>
+    <div class="step-body">
+      <div class="step-head">
+        <h2>Roughness report</h2>
+        <p class="status" id="s3status">Needs NDWI images first.</p>
+      </div>
+      <div class="grid dirgrid">
+        <fieldset class="segmented">
+          <legend>Imagery direction <span class="dir-note" id="roadDir"></span></legend>
+          <div class="seg">
+            <label><input type="radio" name="mode" id="modeA" value="up_to_down" checked><span><span class="seg-main">North → South / West → East</span><span class="seg-sub num" id="upRange">&nbsp;</span></span></label>
+            <label><input type="radio" name="mode" id="modeB" value="down_to_up"><span><span class="seg-main">South → North / East → West</span><span class="seg-sub num" id="downRange">&nbsp;</span></span></label>
+          </div>
+        </fieldset>
+        <div class="field">
+          <label for="surface">Pavement</label>
+          <select id="surface">
+            <option value="Bituminous">Bituminous</option>
+            <option value="Concrete">Concrete</option>
+          </select>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn primary" id="roughBtn">Generate 100 m and 10 m RI (JSON)</button>
+      </div>
+      <div id="s3msg"></div>
+
+      <div id="reportBox" hidden>
+        <details class="jsonbox" open>
+          <summary>RI / IRI JSON (<span id="jsonRes">100 m</span>)</summary>
+          <button type="button" class="btn small" id="copyJson">Copy JSON</button>
+          <pre id="jsonOut" style="max-height:320px;overflow:auto;font-size:12px"></pre>
+        </details>
+
+        <fieldset class="segmented restoggle">
+          <legend>Show sections of</legend>
+          <div class="seg">
+            <label><input type="radio" name="res" value="100m" checked><span>100 m</span></label>
+            <label><input type="radio" name="res" value="10m"><span>10 m</span></label>
+          </div>
+        </fieldset>
+
+        <div class="road" id="road"></div>
+
+        <h3>Summary by lane</h3>
+        <div class="tablewrap summary"><table id="sumTable"></table></div>
+
+        <h3 id="tableTitle">100 m sections</h3>
+        <p class="status">Select a row or a strip cell to see its NDWI image.</p>
+        <figure class="preview" id="preview" hidden>
+          <img id="previewImg" alt="">
+          <figcaption id="previewCap"></figcaption>
+        </figure>
+        <div class="tablewrap"><table id="repTable"></table></div>
+      </div>
+
+      <div id="oldReports" hidden>
+        <h3>Earlier reports</h3>
+        <ul class="runs" id="oldReportsList"></ul>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="vendor/leaflet/leaflet.js"></script>
+<script>
+  /* local copy missing (e.g. only index.html was copied) -> use the CDN */
+  if (!window.L) document.write('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">'
+    + '<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"><\/script>');
+</script>
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
